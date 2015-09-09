@@ -1,0 +1,5 @@
+*~
+.*.sw[op]
+env.sh
+*.pyc
+__pycache__
