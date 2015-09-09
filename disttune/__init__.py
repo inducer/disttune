@@ -68,6 +68,8 @@ def get_db_connection(create_schema):
     if create_schema:
         try_create_schema(db_conn)
 
+    db_conn.set_session(isolation_level="serializable")
+
     return db_conn
 
 # }}}
@@ -86,7 +88,7 @@ def get_git_rev(module=None):
     from subprocess import check_output
     return check_output(
             ["git", "rev-parse", "--short", "HEAD"],
-            cwd=cwd)
+            cwd=cwd).strip()
 
 
 class UnableToRun(Exception):
@@ -194,6 +196,28 @@ def get_cl_properties(dev):
 # }}}
 
 
+def parse_filters(filter_expr):
+    filters = []
+    filter_kwargs = {}
+
+    for f in filter_expr.split(":"):
+        f = f.strip()
+        equal_ind = f.find("~")
+        if equal_ind < 0:
+            raise ValueError("invalid filter: %s" % f)
+
+        fname = f[:equal_ind]
+        fval = f[equal_ind+1:]
+        filters.append(
+            "text(run_properties->'%s')" % fname
+            + " ILIKE " +
+            "%%(%s)s" % fname)
+
+        filter_kwargs[fname] = "%" + fval + "%"
+
+    return filters, filter_kwargs
+
+
 # {{{ enumerate
 
 def batch_up(n, iterator):
@@ -212,8 +236,6 @@ def enumerate_runs(args):
     db_conn = get_db_connection(create_schema=True)
 
     run_class = import_class(args.run_class)
-
-    db_conn.set_session(isolation_level="serializable")
 
     from socket import gethostname
     host = gethostname()
@@ -242,6 +264,29 @@ def enumerate_runs(args):
 # }}}
 
 
+def reset_running(args):
+    db_conn = get_db_connection(create_schema=True)
+
+    filters = [
+            ("state = 'running'"),
+            ]
+    filter_kwargs = {}
+
+    if args.filter:
+        f, fk = parse_filters(args.filter)
+        filters.extend(f)
+        filter_kwargs.update(fk)
+
+    where_clause = " AND ".join(filters)
+
+    with db_conn:
+        with db_conn.cursor() as cur:
+            cur.execute(
+                    "UPDATE run SET state = 'waiting' "
+                    "WHERE " + where_clause + ";",
+                    filter_kwargs)
+
+
 # {{{ run
 
 def run(args):
@@ -249,24 +294,35 @@ def run(args):
 
     run_class = import_class(args.run_class)
 
-    db_conn.set_session(isolation_level="serializable")
-
     from socket import gethostname
     host = gethostname()
 
     import sys
+
+    filters = [
+            ("run_class = %(run_class)s"),
+            ("state = 'waiting'"),
+            ]
+    filter_kwargs = {"run_class": args.run_class}
+
+    if args.filter:
+        f, fk = parse_filters(args.filter)
+        filters.extend(f)
+        filter_kwargs.update(fk)
+
+    where_clause = " AND ".join(filters)
 
     while True:
         with db_conn:
             with db_conn.cursor() as cur:
                 cur.execute(
                         "SELECT id, run_properties FROM run "
-                        "WHERE run_class = %(run_class)s AND state = 'waiting' "
+                        "WHERE " + where_clause + " " +
                         "OFFSET floor(random()*("
                         "   SELECT COUNT(*) FROM run "
-                        "   WHERE run_class = %(run_class)s AND state = 'waiting' "
+                        "   WHERE " + where_clause + " " +
                         ")) LIMIT 1",
-                        dict(run_class=args.run_class))
+                        filter_kwargs)
                 rows = list(cur)
 
                 if not rows:
@@ -276,9 +332,10 @@ def run(args):
 
                 if not args.dry_run:
                     cur.execute("UPDATE run SET state = 'running' WHERE id = %s;",
-                            id_)
+                            (id_,))
 
-        print(id_, run_props)
+        if args.verbose:
+            print(id_, run_props)
 
         env_properties = None
 
@@ -301,18 +358,23 @@ def run(args):
                     "traceback": tb,
                     }
 
+        if args.verbose:
+            print("->", state, result)
+            print("  ", env_properties)
+
         if not args.dry_run:
             with db_conn.cursor() as cur:
                 if state != "waiting" or (state == "error" and args.stop):
                     cur.execute(
                             "UPDATE run "
                             "SET (state, env_properties, "
-                            "   state_time, state_machine_name, result) "
+                            "   state_time, state_machine_name, results) "
                             "= (%(new_state)s, %(env_properties)s, "
                             "   current_timestamp, %(host)s, %(result)s) "
-                            "WHERE id = %(id)s AND state = 'running;",
+                            "WHERE id = %(id)s AND state = 'running';",
                             {"id": id_, "env_properties": Json(env_properties),
-                                "host": host, "result": Json(result)})
+                                "host": host, "result": Json(result),
+                                "new_state": state})
                 else:
                     cur.execute(
                             "UPDATE run SET state = 'waiting' "
@@ -455,12 +517,18 @@ def main():
     parser_enum.add_argument("run_class")
     parser_enum.set_defaults(func=enumerate_runs)
 
+    parser_reset_running = subp.add_parser("reset-running")
+    parser_reset_running.add_argument("--filter", metavar="prop~val:prop~val")
+    parser_reset_running.set_defaults(func=reset_running)
+
     parser_run = subp.add_parser("run")
     parser_run.add_argument("run_class")
     parser_run.add_argument("--stop",
             help="stop on exceptions", action="store_true")
     parser_run.add_argument("-n", "--dry-run",
             help="do not modify database", action="store_true")
+    parser_run.add_argument("-v", "--verbose", action="store_true")
+    parser_run.add_argument("--filter", metavar="prop~val:prop~val")
     parser_run.set_defaults(func=run)
 
     parser_console = subp.add_parser("console")

@@ -1,6 +1,6 @@
 from __future__ import print_function, division
 
-from disttune import RunBase, UnableToRun
+from disttune import RunBase
 import numpy as np
 import loopy as lp
 import pyopencl as cl
@@ -193,8 +193,8 @@ class Run(RunBase):
 
         nbf = pdim_lagrange(sd, deg)
 
-        (_, num_parallel, num_work_items) \
-                = apply_options(None, i_split, j_split, nbf)
+        (knl, num_parallel, num_work_items) \
+                = apply_options(knl, i_split, j_split, nbf)
 
         if num_cells is not None:
             knl = apply_num_cells(
@@ -214,5 +214,6 @@ class Run(RunBase):
 
         refknl, knl = cls.get_loopy_kernel(run_props, dev)
 
-        return lp.auto_time(
-                ctx, knl, parameters={'nels': run_props["nels"]})
+        return lp.auto_test_vs_ref(
+                knl, ctx, parameters={'nels': run_props["nels"]},
+                quiet=True)
