@@ -209,10 +209,21 @@ def parse_filters(filter_expr):
 
         fname = f[:equal_ind]
         fval = f[equal_ind+1:]
-        filters.append(
-            "text(run_properties->'%s')" % fname
-            + " ILIKE " +
-            "%%(%s)s" % fname)
+        if fname in [
+                "id"
+                "run_class",
+                "creation_machine_name",
+                ]:
+            filters.append(
+                "text(%s)" % fname
+                + " ILIKE " +
+                "%%(%s)s" % fname)
+
+        else:
+            filters.append(
+                "text(run_properties->'%s')" % fname
+                + " ILIKE " +
+                "%%(%s)s" % fname)
 
         filter_kwargs[fname] = "%" + fval + "%"
 
