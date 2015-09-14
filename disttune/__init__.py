@@ -246,10 +246,12 @@ def enumerate_runs(args):
     with db_conn:
         with db_conn.cursor() as cur:
 
-            for batch in batch_up(
-                    20, (
+            batch_size = 20
+            count = 0
+            for ibatch, batch in enumerate(batch_up(
+                    batch_size, (
                         (host, args.run_class, Json(run_props))
-                        for run_props in run_class.enumerate_runs({}))):
+                        for run_props in run_class.enumerate_runs({})))):
                 cur.executemany("INSERT INTO run ("
                         "creation_machine_name,"
                         "run_class,"
@@ -257,10 +259,16 @@ def enumerate_runs(args):
                         "state) values (%s,%s,%s,'waiting');",
                         batch)
 
-                sys.stdout.write(".")
+                count += len(batch)
+
+                if ibatch % 15 == 0:
+                    sys.stdout.write("(%d jobs created)" % count)
+                else:
+                    sys.stdout.write(".")
                 sys.stdout.flush()
 
             sys.stdout.write("\n")
+            sys.stdout.write("%d jobs created altogether\n" % count)
 
 # }}}
 
