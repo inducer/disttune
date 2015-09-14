@@ -98,10 +98,10 @@ class Run(RunBase):
     def enumerate_runs(cls, options):
         from disttune import enumerate_distinct_cl_devices, get_cl_device
 
-        max_wgs = 1024
-
         for cl_dev_data in enumerate_distinct_cl_devices():
             dev = get_cl_device(cl_dev_data)
+
+            max_wg = dev.max_work_group_size
 
             for sd in [2, 3]:
                 for deg in [1, 2, 3]:
