@@ -14,7 +14,7 @@ Actually run jobs::
 
 The filter expression can be used to limit what jobs are run.
 
-Run interactive Python shell with database connection:
+Run interactive Python shell with database connection::
 
     python -m disttune console
     >>> .q select * from run;
