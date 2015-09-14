@@ -364,7 +364,7 @@ def run(args):
 
         if not args.dry_run:
             with db_conn.cursor() as cur:
-                if state != "waiting" or (state == "error" and args.stop):
+                if state != "waiting" or (state == "error" and not args.stop):
                     cur.execute(
                             "UPDATE run "
                             "SET (state, env_properties, "
