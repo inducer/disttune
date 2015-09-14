@@ -246,11 +246,18 @@ def enumerate_runs(args):
     with db_conn:
         with db_conn.cursor() as cur:
 
+            def add_tags(run_props):
+                run_props = run_props.copy()
+                if args.tag:
+                    run_props["tags"] = args.tag
+
+                return run_props
+
             batch_size = 20
             count = 0
             for ibatch, batch in enumerate(batch_up(
                     batch_size, (
-                        (host, args.run_class, Json(run_props))
+                        (host, args.run_class, Json(add_tags(run_props)))
                         for run_props in run_class.enumerate_runs({})))):
                 cur.executemany("INSERT INTO run ("
                         "creation_machine_name,"
@@ -524,6 +531,7 @@ def main():
 
     parser_enum = subp.add_parser("enum")
     parser_enum.add_argument("run_class")
+    parser_enum.add_argument("--tag", metavar="TAG", nargs="*")
     parser_enum.set_defaults(func=enumerate_runs)
 
     parser_reset_running = subp.add_parser("reset-running")
