@@ -120,16 +120,14 @@ class Run(RunBase):
                             (_, num_parallel, num_work_items) \
                                     = apply_options(None, i_split, j_split, nbf)
 
-                            nc_values = [None]
+                            nc_values = [1]
 
                             num_cells = 2
 
                             # FIXME: Will this really only try num_cells==2?
 
                             # now try multiple cells
-                            while (num_cells * num_work_items < max_wgs
-                                    and num_cells <= 2):
-
+                            while num_cells * num_work_items < max_wg:
                                 nc_values.append(num_cells)
                                 num_cells += 1
 

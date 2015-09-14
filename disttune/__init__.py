@@ -177,7 +177,8 @@ def get_cl_device(run_props):
                 if dev.name == run_props["cl_device"]:
                     return dev
 
-    raise CLDeviceNotFound(str(run_props["cl_platform"], run_props["cl_device"]))
+    raise CLDeviceNotFound(str(run_props["cl_platform"]) + ", " 
+                           + str(run_props["cl_device"]))
 
 
 def get_cl_properties(dev):
