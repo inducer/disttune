@@ -197,11 +197,11 @@ def get_cl_properties(dev):
 # }}}
 
 
-def parse_filters(filter_expr):
+def parse_filters(filters):
     filters = []
     filter_kwargs = {}
 
-    for f in filter_expr.split(":"):
+    for f in filters:
         f = f.strip()
         equal_ind = f.find("~")
         if equal_ind < 0:
@@ -244,6 +244,16 @@ def batch_up(n, iterator):
         yield batch
 
 
+def limit_iterator(max_count, it):
+    count = 0
+    for item in it:
+        yield item
+
+        count += 1
+        if max_count is not None and count >= max_count:
+            return
+
+
 def enumerate_runs(args):
     db_conn = get_db_connection(create_schema=True)
 
@@ -252,24 +262,54 @@ def enumerate_runs(args):
     from socket import gethostname
     host = gethostname()
 
-    import sys
+    enum_options = {}
+    for s in args.options:
+        s = s.strip()
+        equal_ind = s.find("=")
+        if equal_ind < 0:
+            raise ValueError("invalid enum argument: %s" % s)
+
+        aname = s[:equal_ind]
+        aval = s[equal_ind+1:]
+        enum_options[aname] = aval
+
+    def get_enum_iterator():
+        it = run_class.enumerate_runs(enum_options)
+        it = limit_iterator(args.limit, it)
+        return it
+
+    total_count = 0
+
+    print("counting...")
+
+    for ijob, run_props in enumerate(get_enum_iterator()):
+        if ijob % 10000 == 0 and ijob:
+            print("%d jobs, still counting..." % ijob)
+        total_count += 1
+
+    print("creating %d jobs..." % total_count)
+
+    def add_args(run_props):
+        run_props = run_props.copy()
+        if args.tags:
+            run_props["tags"] = args.tags
+        if enum_options:
+            run_props["enum_options"] = enum_options
+
+        return run_props
 
     with db_conn:
         with db_conn.cursor() as cur:
 
-            def add_tags(run_props):
-                run_props = run_props.copy()
-                if args.tag:
-                    run_props["tags"] = args.tag
-
-                return run_props
+            from pytools import ProgressBar
+            pb = ProgressBar("enumerate jobs", total_count)
 
             batch_size = 20
             count = 0
             for ibatch, batch in enumerate(batch_up(
                     batch_size, (
-                        (host, args.run_class, Json(add_tags(run_props)))
-                        for run_props in run_class.enumerate_runs({})))):
+                        (host, args.run_class, Json(add_args(run_props)))
+                        for run_props in get_enum_iterator()))):
                 cur.executemany("INSERT INTO run ("
                         "creation_machine_name,"
                         "run_class,"
@@ -277,16 +317,12 @@ def enumerate_runs(args):
                         "state) values (%s,%s,%s,'waiting');",
                         batch)
 
+                pb.progress(len(batch))
                 count += len(batch)
 
-                if ibatch % 15 == 0:
-                    sys.stdout.write("(%d jobs created)" % count)
-                else:
-                    sys.stdout.write(".")
-                sys.stdout.flush()
+            pb.finished()
 
-            sys.stdout.write("\n")
-            sys.stdout.write("%d jobs created altogether\n" % count)
+            print("%d jobs created" % count)
 
 # }}}
 
@@ -542,11 +578,15 @@ def main():
 
     parser_enum = subp.add_parser("enum")
     parser_enum.add_argument("run_class")
-    parser_enum.add_argument("--tag", metavar="TAG", nargs="*")
+    parser_enum.add_argument("--options", metavar="KEY=VAL", nargs="*",
+            help="specify options to be passed to enumerate_runs()")
+    parser_enum.add_argument("--tags", metavar="TAG", nargs="*")
+    parser_enum.add_argument("--limit", metavar="COUNT", type=int,
+            help="create at most COUNT jobs")
     parser_enum.set_defaults(func=enumerate_runs)
 
     parser_reset_running = subp.add_parser("reset-running")
-    parser_reset_running.add_argument("--filter", metavar="prop~val:prop~val")
+    parser_reset_running.add_argument("--filter", metavar="prop~val", nargs="*")
     parser_reset_running.set_defaults(func=reset_running)
 
     parser_run = subp.add_parser("run")

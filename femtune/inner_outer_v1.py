@@ -101,6 +101,10 @@ class Run(RunBase):
         for cl_dev_data in enumerate_distinct_cl_devices():
             dev = get_cl_device(cl_dev_data)
 
+            if "cl_platform" in options:
+                if options["cl_platform"].lower() not in dev.platform.name.lower():
+                    continue
+
             max_wg = min(dev.max_work_group_size, 1024)
 
             for sd in [2, 3]:
@@ -124,10 +128,9 @@ class Run(RunBase):
 
                             num_cells = 2
 
-                            # FIXME: Will this really only try num_cells==2?
-
                             # now try multiple cells
-                            while num_cells * num_work_items < max_wg:
+                            while (num_cells * num_work_items < max_wg
+                                    and num_cells < 15):
                                 nc_values.append(num_cells)
                                 num_cells += 1
 
