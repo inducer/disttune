@@ -539,6 +539,7 @@ class DisttuneConsole(code.InteractiveConsole):
             import os
             import atexit
 
+            readline.set_history_length(-1)
             histfile = os.path.join(os.environ["HOME"], ".disttunehist")
             if os.access(histfile, os.R_OK):
                 readline.read_history_file(histfile)
