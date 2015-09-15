@@ -10,7 +10,7 @@ class that's driving the run.
 
 Actually run jobs::
 
-    python -m disttune run --stop femtune.inner_outer_v1.Run -v --filter "cl_platform~intel"
+    python -m disttune run --stop -v --filter run_class=femtune.inner_outer_v1.Run "cl_platform~intel"
 
 The filter expression can be used to limit what jobs are run.
 

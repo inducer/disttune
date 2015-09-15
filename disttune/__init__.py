@@ -203,29 +203,35 @@ def parse_filters(filter_args):
 
     for f in filter_args:
         f = f.strip()
-        equal_ind = f.find("~")
-        if equal_ind < 0:
+        op_ind = max(f.find("~"), f.find("="))
+        op = f[op_ind]
+
+        if op_ind < 0:
             raise ValueError("invalid filter: %s" % f)
 
-        fname = f[:equal_ind]
-        fval = f[equal_ind+1:]
+        fname = f[:op_ind]
+        fval = f[op_ind+1:]
+
         if fname in [
-                "id"
+                "id",
                 "run_class",
                 "creation_machine_name",
                 ]:
-            filters.append(
-                "text(%s)" % fname
-                + " ILIKE " +
-                "%%(%s)s" % fname)
+            lhs = "text(%s)" % fname
 
         else:
-            filters.append(
-                "text(run_properties->'%s')" % fname
-                + " ILIKE " +
-                "%%(%s)s" % fname)
+            lhs = "run_properties->>'%s'" % fname
 
-        filter_kwargs[fname] = "%" + fval + "%"
+        if op == "~":
+            filters.append(
+                lhs + " ILIKE " +
+                "%%(%s)s" % fname)
+            filter_kwargs[fname] = "%" + fval + "%"
+        elif op == "=":
+            filters.append(lhs + "=" + "%%(%s)s" % fname)
+            filter_kwargs[fname] = fval
+        else:
+            raise ValueError("invalid operand")
 
     return filters, filter_kwargs
 
@@ -355,18 +361,13 @@ def reset_running(args):
 def run(args):
     db_conn = get_db_connection(create_schema=True)
 
-    run_class = import_class(args.run_class)
-
     from socket import gethostname
     host = gethostname()
 
     import sys
 
-    filters = [
-            ("run_class = %(run_class)s"),
-            ("state = 'waiting'"),
-            ]
-    filter_kwargs = {"run_class": args.run_class}
+    filters = [("state = 'waiting'")]
+    filter_kwargs = {}
 
     if args.filter:
         f, fk = parse_filters(args.filter)
@@ -374,12 +375,13 @@ def run(args):
         filter_kwargs.update(fk)
 
     where_clause = " AND ".join(filters)
+    print(where_clause)
 
     while True:
         with db_conn:
             with db_conn.cursor() as cur:
                 cur.execute(
-                        "SELECT id, run_properties FROM run "
+                        "SELECT id, run_class, run_properties FROM run "
                         "WHERE " + where_clause + " " +
                         "OFFSET floor(random()*("
                         "   SELECT COUNT(*) FROM run "
@@ -391,7 +393,7 @@ def run(args):
                 if not rows:
                     break
 
-                (id_, run_props), = rows
+                (id_, run_class, run_props), = rows
 
                 if not args.dry_run:
                     cur.execute("UPDATE run SET state = 'running' WHERE id = %s;",
@@ -404,6 +406,7 @@ def run(args):
 
         env_properties = None
 
+        run_class = import_class(run_class)
         try:
             env_properties = run_class.get_env_properties(run_props)
 
@@ -604,18 +607,17 @@ def main():
 
     parser_reset_running = subp.add_parser("reset-running")
     parser_reset_running.add_argument(
-            "--filter", metavar="prop~val", nargs="*")
+            "--filter", metavar="prop=val or prop~val", nargs="*")
     parser_reset_running.set_defaults(func=reset_running)
 
     parser_run = subp.add_parser("run")
-    parser_run.add_argument("run_class")
     parser_run.add_argument("--stop",
             help="stop on exceptions", action="store_true")
     parser_run.add_argument("-n", "--dry-run",
             help="do not modify database", action="store_true")
     parser_run.add_argument("-v", "--verbose", action="store_true")
     parser_run.add_argument(
-            "--filter", metavar="prop~val", nargs="*")
+            "--filter", metavar="prop=val or prop~val", nargs="*")
     parser_run.set_defaults(func=run)
 
     parser_console = subp.add_parser("console")
