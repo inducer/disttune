@@ -486,12 +486,25 @@ def table_from_cursor(cursor):
     return tbl
 
 
+def mangle_query(qry):
+    import re
+    qry, _ = re.subn(r"rp\.([a-zA-Z_0-9]+)", r"(run_properties->>'\1')", qry)
+    qry, _ = re.subn(r"ep\.([a-zA-Z_0-9]+)", r"(env_properties->>'\1')", qry)
+    qry, _ = re.subn(r"res\.([a-zA-Z_0-9]+)", r"(results->>'\1')", qry)
+    qry, _ = re.subn(r"rp\.\.([a-zA-Z_0-9]+)", r"(run_properties->'\1')", qry)
+    qry, _ = re.subn(r"ep\.\.([a-zA-Z_0-9]+)", r"(env_properties->'\1')", qry)
+    qry, _ = re.subn(r"res\.\.([a-zA-Z_0-9]+)", r"(results->'\1')", qry)
+    print(qry)
+    return qry
+
+
 def make_disttune_symbols(db_conn):
     return {
             "__name__": "__console__",
             "__doc__": None,
             "db_conn": db_conn,
             "table_from_cursor": table_from_cursor,
+            "mangle_query": mangle_query,
             }
 
 
@@ -570,7 +583,7 @@ Available Python symbols:
         elif cmd == "q":
             with self.db_conn:
                 with self.db_conn.cursor() as cur:
-                    cur.execute(args)
+                    cur.execute(mangle_query(args))
                     tbl = table_from_cursor(cur)
                     if tbl is not None:
                         print(tbl)
