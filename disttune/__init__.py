@@ -201,7 +201,6 @@ def parse_filters(filter_args):
     filters = []
     filter_kwargs = {}
 
-    print(filter_args)
     for f in filter_args:
         f = f.strip()
         equal_ind = f.find("~")
@@ -375,7 +374,6 @@ def run(args):
         filter_kwargs.update(fk)
 
     where_clause = " AND ".join(filters)
-    print(where_clause)
 
     while True:
         with db_conn:
