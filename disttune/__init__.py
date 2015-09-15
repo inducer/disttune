@@ -197,11 +197,12 @@ def get_cl_properties(dev):
 # }}}
 
 
-def parse_filters(filters):
+def parse_filters(filter_args):
     filters = []
     filter_kwargs = {}
 
-    for f in filters:
+    print(filter_args)
+    for f in filter_args:
         f = f.strip()
         equal_ind = f.find("~")
         if equal_ind < 0:
@@ -374,6 +375,7 @@ def run(args):
         filter_kwargs.update(fk)
 
     where_clause = " AND ".join(filters)
+    print(where_clause)
 
     while True:
         with db_conn:
@@ -398,7 +400,9 @@ def run(args):
                             (id_,))
 
         if args.verbose:
+            print(75*"=")
             print(id_, run_props)
+            print(75*"-")
 
         env_properties = None
 
@@ -410,6 +414,13 @@ def run(args):
         except UnableToRun:
             state = "waiting"
             result = None
+
+            if args.verbose:
+                print(75*"-")
+                print("-> unable to run")
+                from traceback import print_exc
+                print_exc()
+
         except Exception as e:
             from traceback import format_exc
             tb = format_exc()
@@ -421,9 +432,17 @@ def run(args):
                     "traceback": tb,
                     }
 
-        if args.verbose:
-            print("->", state, result)
-            print("  ", env_properties)
+            if args.verbose:
+                print(75*"-")
+                print("-> error")
+                from traceback import print_exc
+                print_exc()
+
+        else:
+            if args.verbose:
+                print("->", state)
+                print("  ", result)
+                print("  ", env_properties)
 
         if not args.dry_run:
             with db_conn.cursor() as cur:
@@ -441,7 +460,7 @@ def run(args):
                 else:
                     cur.execute(
                             "UPDATE run SET state = 'waiting' "
-                            "WHERE id = %(id)s AND state = 'running;",
+                            "WHERE id = %(id)s AND state = 'running';",
                             {"id": id_})
 
         if args.stop and state == "error":
@@ -586,7 +605,8 @@ def main():
     parser_enum.set_defaults(func=enumerate_runs)
 
     parser_reset_running = subp.add_parser("reset-running")
-    parser_reset_running.add_argument("--filter", metavar="prop~val", nargs="*")
+    parser_reset_running.add_argument(
+            "--filter", metavar="prop~val", nargs="*")
     parser_reset_running.set_defaults(func=reset_running)
 
     parser_run = subp.add_parser("run")
@@ -596,7 +616,8 @@ def main():
     parser_run.add_argument("-n", "--dry-run",
             help="do not modify database", action="store_true")
     parser_run.add_argument("-v", "--verbose", action="store_true")
-    parser_run.add_argument("--filter", metavar="prop~val:prop~val")
+    parser_run.add_argument(
+            "--filter", metavar="prop~val", nargs="*")
     parser_run.set_defaults(func=run)
 
     parser_console = subp.add_parser("console")
