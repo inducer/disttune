@@ -494,7 +494,6 @@ def mangle_query(qry):
     qry, _ = re.subn(r"rp\.\.([a-zA-Z_0-9]+)", r"(run_properties->'\1')", qry)
     qry, _ = re.subn(r"ep\.\.([a-zA-Z_0-9]+)", r"(env_properties->'\1')", qry)
     qry, _ = re.subn(r"res\.\.([a-zA-Z_0-9]+)", r"(results->'\1')", qry)
-    print(qry)
     return qry
 
 
