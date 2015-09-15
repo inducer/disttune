@@ -269,15 +269,16 @@ def enumerate_runs(args):
     host = gethostname()
 
     enum_options = {}
-    for s in args.options:
-        s = s.strip()
-        equal_ind = s.find("=")
-        if equal_ind < 0:
-            raise ValueError("invalid enum argument: %s" % s)
+    if args.options:
+        for s in args.options:
+            s = s.strip()
+            equal_ind = s.find("=")
+            if equal_ind < 0:
+                raise ValueError("invalid enum argument: %s" % s)
 
-        aname = s[:equal_ind]
-        aval = s[equal_ind+1:]
-        enum_options[aname] = aval
+            aname = s[:equal_ind]
+            aval = s[equal_ind+1:]
+            enum_options[aname] = aval
 
     def get_enum_iterator():
         it = run_class.enumerate_runs(enum_options)
@@ -375,7 +376,6 @@ def run(args):
         filter_kwargs.update(fk)
 
     where_clause = " AND ".join(filters)
-    print(where_clause)
 
     while True:
         with db_conn:
