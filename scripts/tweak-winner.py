@@ -38,14 +38,8 @@ queue = cl.CommandQueue(ctx, properties=cl.command_queue_properties.PROFILING_EN
 
 refknl, knl = run_class.get_loopy_kernel(run_props, dev)
 
-#print(knl)
-
 if 0:
-    res2 = lp.auto_test_vs_ref(
-            knl, ctx, parameters={'nels': run_props["nels"]},
-            quiet=True)
-
-    print(res2)
+    print(knl)
 
 time = res["elapsed_wall"]
 
@@ -64,9 +58,24 @@ gmem_poly_ev = {
 print("GMEM [GB/s]")
 print(lp.stringify_stats_mapping(gmem_poly_ev))
 
-knl = lp.preprocess_kernel(knl)
-code, _ = lp.generate_code(knl)
-print(code)
+if 1:
+    print(knl)
+    #knl = lp.add_prefetch(knl, "DFinv[c_inner+c_outer*8,:,:]")
+    knl = lp.add_prefetch(knl, "DPsi[:,:,:]", default_tag=None)
+    print(knl)
 
-prg = cl.Program(ctx, code).build()
-print(prg.binaries[0])
+    res2 = lp.auto_test_vs_ref(
+            knl, ctx, parameters={'nels': run_props["nels"]},
+            quiet=True)
+
+    print(res2)
+
+if 1:
+    knl = lp.preprocess_kernel(knl)
+    code, _ = lp.generate_code(knl)
+    print(code)
+
+    if 0:  # print ptx
+        prg = cl.Program(ctx, code).build()
+        print(prg.binaries[0])
+
