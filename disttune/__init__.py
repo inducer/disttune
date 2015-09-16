@@ -471,7 +471,7 @@ def run(args):
 # }}}
 
 
-# {{{ console
+# {{{ shell
 
 def table_from_cursor(cursor):
     from pytools import Table
@@ -498,10 +498,22 @@ def mangle_query(qry):
 
 
 def make_disttune_symbols(db_conn):
+    def q(qry, *arg_dicts, **extra_kwargs):
+        args = {}
+        args.update(extra_kwargs)
+        for d in arg_dicts:
+            args.update(d)
+
+        cur = db_conn.cursor()
+        cur.execute(mangle_query(qry), args)
+        return cur
+
     return {
             "__name__": "__console__",
             "__doc__": None,
             "db_conn": db_conn,
+            "q": q,
+            "p": lambda qry: print(table_from_cursor(q(qry))),
             "table_from_cursor": table_from_cursor,
             "mangle_query": mangle_query,
             }
@@ -601,6 +613,23 @@ def console(args):
             "Copyright (c) Andreas Kloeckner 2015\n"
             "Run .help to see help" % sys.version)
 
+
+def script(args):
+    db_conn = get_db_connection(create_schema=False)
+
+    from os.path import abspath, dirname
+    scriptdir = dirname(abspath(args.script))
+
+    import sys
+    sys.path.append(scriptdir)
+
+    namespace = make_disttune_symbols(db_conn)
+
+    with open(args.script, "rt") as s:
+        script_contents = s.read()
+
+    exec(compile(script_contents, args.script, 'exec'), namespace)
+
 # }}}
 
 
@@ -635,6 +664,12 @@ def main():
 
     parser_console = subp.add_parser("console")
     parser_console.set_defaults(func=console)
+
+    parser_script = subp.add_parser("script")
+    parser_script.add_argument("script", metavar="SCRIPT.PY")
+    parser_script.add_argument("script_args", metavar="ARG",
+        nargs="*")
+    parser_script.set_defaults(func=script)
 
     args = parser.parse_args()
     args.func(args)
