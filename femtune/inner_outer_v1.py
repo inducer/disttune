@@ -207,6 +207,9 @@ class Run(RunBase):
 
     @classmethod
     def run(cls, run_props):
+        from pyopencl.tools import clear_first_arg_caches
+        clear_first_arg_caches()
+
         from disttune import get_cl_device
         dev = get_cl_device(run_props)
 
