@@ -118,7 +118,7 @@ def curlcurlrefknl(dtype):
     knl = lp.make_kernel(loop_bounds,
                          kernel,
                          args,
-                         assumptions="nels>=1 and nbf >= 1 and nels mod 4 = 0")
+                         assumptions="nels>=1 and nbf >= 1 and nels mod 4=0")
 
     knl = lp.set_loop_priority(knl, ["c", "j", "i", "k"])
     return knl
