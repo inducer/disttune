@@ -672,6 +672,11 @@ def main():
     parser_script.set_defaults(func=script)
 
     args = parser.parse_args()
+    if not hasattr(args, "func"):
+        parser.print_usage()
+        import sys
+        sys.exit(1)
+
     args.func(args)
 
 # vim: foldmethod=marker
