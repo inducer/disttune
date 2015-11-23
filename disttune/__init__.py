@@ -88,7 +88,7 @@ def get_git_rev(module=None):
     from subprocess import check_output
     return check_output(
             ["git", "rev-parse", "--short", "HEAD"],
-            cwd=cwd).strip()
+            cwd=cwd).strip().decode()
 
 
 class UnableToRun(Exception):
