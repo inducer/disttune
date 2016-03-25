@@ -442,16 +442,25 @@ def run(args):
             from traceback import format_exc
             tb = format_exc()
 
-            state = "error"
-            result = {
-                    "error": type(e).__name__,
-                    "error_value": str(e),
-                    "traceback": tb,
-                    }
+            if args.retry_on_error:
+                state = "waiting"
+                result = None
+
+                disposition_msg = "error (will be retried)"
+
+            else:
+                state = "error"
+                result = {
+                        "error": type(e).__name__,
+                        "error_value": str(e),
+                        "traceback": tb,
+                        }
+
+                disposition_msg = "error (permanent)"
 
             if args.verbose:
                 print(75*"-")
-                print("-> error")
+                print("->", disposition_msg)
                 from traceback import print_exc
                 print_exc()
 
@@ -467,7 +476,7 @@ def run(args):
             with db_conn:
 
                 with db_conn.cursor() as cur:
-                    if state != "waiting" or (state == "error" and not args.stop):
+                    if state != "waiting" or (state == "error" and not args.stop_on_error):
                         cur.execute(
                                 "UPDATE run "
                                 "SET (state, env_properties, "
@@ -484,7 +493,7 @@ def run(args):
                                 "WHERE id = %(id)s AND state = 'running';",
                                 {"id": id_})
 
-        if args.stop and state == "error":
+        if args.stop_on_error and state == "error":
             print(tb, file=sys.stderr)
             break
 
@@ -673,8 +682,11 @@ def main():
     parser_reset_running.set_defaults(func=reset_running)
 
     parser_run = subp.add_parser("run")
-    parser_run.add_argument("--stop",
-            help="stop on exceptions", action="store_true")
+    parser_run.add_argument("--stop-on-error",
+            help="stop execution on exceptions", action="store_true")
+    parser_run.add_argument("--retry-on-error",
+            help="if execution fails with an error, return run to 'waiting' status",
+            action="store_true")
     parser_run.add_argument("-n", "--dry-run",
             help="do not modify database", action="store_true")
     parser_run.add_argument("-v", "--verbose", action="store_true")
