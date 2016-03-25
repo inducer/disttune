@@ -386,7 +386,9 @@ def run(args):
 
     while True:
         try:
+            # Start transaction for atomic state update.
             with db_conn:
+
                 with db_conn.cursor() as cur:
                     cur.execute(
                             "SELECT id, run_class, run_properties FROM run "
@@ -407,8 +409,10 @@ def run(args):
                         cur.execute(
                                 "UPDATE run SET state = 'running' WHERE id = %s;",
                                 (id_,))
+
         except TransactionRollbackError:
-            print("Retrying job retrieval...")
+            if args.verbose:
+                print("Retrying job retrieval...")
             continue
 
         if args.verbose:
@@ -458,23 +462,27 @@ def run(args):
                 print("  ", env_properties)
 
         if not args.dry_run:
-            with db_conn.cursor() as cur:
-                if state != "waiting" or (state == "error" and not args.stop):
-                    cur.execute(
-                            "UPDATE run "
-                            "SET (state, env_properties, "
-                            "   state_time, state_machine_name, results) "
-                            "= (%(new_state)s, %(env_properties)s, "
-                            "   current_timestamp, %(host)s, %(result)s) "
-                            "WHERE id = %(id)s AND state = 'running';",
-                            {"id": id_, "env_properties": Json(env_properties),
-                                "host": host, "result": Json(result),
-                                "new_state": state})
-                else:
-                    cur.execute(
-                            "UPDATE run SET state = 'waiting' "
-                            "WHERE id = %(id)s AND state = 'running';",
-                            {"id": id_})
+            # Start transaction. Otherwise we'll implicitly start a transaction
+            # that contains the rest of our run.
+            with db_conn:
+
+                with db_conn.cursor() as cur:
+                    if state != "waiting" or (state == "error" and not args.stop):
+                        cur.execute(
+                                "UPDATE run "
+                                "SET (state, env_properties, "
+                                "   state_time, state_machine_name, results) "
+                                "= (%(new_state)s, %(env_properties)s, "
+                                "   current_timestamp, %(host)s, %(result)s) "
+                                "WHERE id = %(id)s AND state = 'running';",
+                                {"id": id_, "env_properties": Json(env_properties),
+                                    "host": host, "result": Json(result),
+                                    "new_state": state})
+                    else:
+                        cur.execute(
+                                "UPDATE run SET state = 'waiting' "
+                                "WHERE id = %(id)s AND state = 'running';",
+                                {"id": id_})
 
         if args.stop and state == "error":
             print(tb, file=sys.stderr)
