@@ -402,7 +402,7 @@ def run(args):
                                 "UPDATE run SET state = 'running' WHERE id = %s;",
                                 (id_,))
         except TransactionRollbackError:
-            # just try again
+            print("Retrying job retrieval...")
             continue
 
         if args.verbose:
