@@ -223,14 +223,20 @@ def parse_filters(filter_args):
         else:
             lhs = "run_properties->>'%s'" % fname
 
+        from random import choice
+        f_kwarg_name = fname
+        while f_kwarg_name in filter_kwargs:
+            f_kwarg_name += choice("0123456789")
+
         if op == "~":
             filters.append(
-                lhs + " ILIKE " +
-                "%%(%s)s" % fname)
-            filter_kwargs[fname] = "%" + fval + "%"
+                # case insensitive regex
+                lhs + " ~* " +
+                "%%(%s)s" % f_kwarg_name)
+            filter_kwargs[f_kwarg_name] = ".*" + fval + ".*"
         elif op == "=":
-            filters.append(lhs + "=" + "%%(%s)s" % fname)
-            filter_kwargs[fname] = fval
+            filters.append(lhs + "=" + "%%(%s)s" % f_kwarg_name)
+            filter_kwargs[f_kwarg_name] = fval
         else:
             raise ValueError("invalid operand")
 
