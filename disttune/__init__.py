@@ -2,6 +2,7 @@ from __future__ import print_function, division
 
 import psycopg2
 from psycopg2.extras import Json
+from psycopg2.extensions import TransactionRollbackError
 
 import code
 
@@ -378,26 +379,31 @@ def run(args):
     where_clause = " AND ".join(filters)
 
     while True:
-        with db_conn:
-            with db_conn.cursor() as cur:
-                cur.execute(
-                        "SELECT id, run_class, run_properties FROM run "
-                        "WHERE " + where_clause + " " +
-                        "OFFSET floor(random()*("
-                        "   SELECT COUNT(*) FROM run "
-                        "   WHERE " + where_clause + " " +
-                        ")) LIMIT 1",
-                        filter_kwargs)
-                rows = list(cur)
+        try:
+            with db_conn:
+                with db_conn.cursor() as cur:
+                    cur.execute(
+                            "SELECT id, run_class, run_properties FROM run "
+                            "WHERE " + where_clause + " " +
+                            "OFFSET floor(random()*("
+                            "   SELECT COUNT(*) FROM run "
+                            "   WHERE " + where_clause + " " +
+                            ")) LIMIT 1",
+                            filter_kwargs)
+                    rows = list(cur)
 
-                if not rows:
-                    break
+                    if not rows:
+                        break
 
-                (id_, run_class, run_props), = rows
+                    (id_, run_class, run_props), = rows
 
-                if not args.dry_run:
-                    cur.execute("UPDATE run SET state = 'running' WHERE id = %s;",
-                            (id_,))
+                    if not args.dry_run:
+                        cur.execute(
+                                "UPDATE run SET state = 'running' WHERE id = %s;",
+                                (id_,))
+        except TransactionRollbackError:
+            # just try again
+            continue
 
         if args.verbose:
             print(75*"=")
