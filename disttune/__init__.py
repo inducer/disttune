@@ -417,7 +417,7 @@ def run(args):
 
         if args.verbose:
             print(75*"=")
-            print(id_, run_props)
+            print(id_, run_class, run_props)
             print(75*"-")
 
         env_properties = None
