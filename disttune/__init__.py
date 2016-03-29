@@ -362,6 +362,7 @@ def reset_running(args):
                     "UPDATE run SET state = 'waiting' "
                     "WHERE " + where_clause + ";",
                     filter_kwargs)
+            print("%d jobs reset" % cur.rowcount)
 
 
 # {{{ run
@@ -530,8 +531,10 @@ def table_from_cursor(cursor):
 
     tbl = Table()
     tbl.add_row([column[0] for column in cursor.description])
+
     for row in cursor:
         tbl.add_row(row)
+
     return tbl
 
 
@@ -648,6 +651,7 @@ Available Python symbols:
                     tbl = table_from_cursor(cur)
                     if tbl is not None:
                         print(tbl)
+                    print("%d rows" % cur.rowcount)
 
         else:
             print("invalid magic command")
