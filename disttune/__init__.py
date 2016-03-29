@@ -384,7 +384,8 @@ def run(args):
 
     where_clause = " AND ".join(filters)
 
-    while True:
+    quit_flag = False
+    while not quit_flag:
         try:
             # Start transaction for atomic state update.
             with db_conn:
@@ -437,6 +438,13 @@ def run(args):
                 print("-> unable to run")
                 from traceback import print_exc
                 print_exc()
+
+        except KeyboardInterrupt:
+                state = "waiting"
+                result = None
+
+                disposition_msg = "interrupted (will be retried)"
+                quit_flag = True
 
         except Exception as e:
             from traceback import format_exc
