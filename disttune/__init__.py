@@ -189,6 +189,7 @@ def get_cl_properties(dev):
 
         "cl_platform_vendor": plat.vendor,
         "cl_platform_version": plat.version,
+        "cl_device_name": dev.name,
         "cl_device_vendor": dev.vendor,
         "cl_device_version": dev.version,
         "cl_device_extensions": dev.extensions,
